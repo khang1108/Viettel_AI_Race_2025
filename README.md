@@ -57,9 +57,9 @@ This project leverages a modern, high-performance tech stack:
 The project is organized into distinct modules for backend, frontend, and data, promoting clean architecture and scalability.
 
 ```bash
-insightminer/
+viettelairace/
 ├── backend/                  # FastAPI Backend source code & AI/ML pipeline
-│   ├── app/
+│   ├── app/viettelairace
 │   │   ├── api/              # API endpoint definitions
 │   │   ├── services/         # Core business logic (PDF parsing, RAG, etc.)
 │   │   └── main.py           # Application entry point
