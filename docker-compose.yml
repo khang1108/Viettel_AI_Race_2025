@@ -1,154 +1,64 @@
-version: "1.0"
-
-x-health-interval: &health-interval 5s
-x-health-timeout: &health-timeout 5s
-x-health-retries: &health-retries 5
-
+version: "3.9"
 services:
-  postgres:
-    image: postgres:15
-    env_file:
-      - .env
+  db:
+    image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+      POSTGRES_DB: ${PGDATABASE}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - pgdata:/var/lib/postgresql/data
+    ports: ["5432:5432"]
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
-      interval: *health-interval
-      timeout: *health-timeout
-      retries: *health-retries
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER} -d ${PGDATABASE}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: rabbitmq
-    env_file:
-      - .env
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
     ports:
-      - "5672:5672"   # AMQP
-      - "15672:15672" # Management UI
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "is_running"]
-      interval: *health-interval
-      timeout: *health-timeout
-      retries: *health-retries
+      - "5672:5672"
+      - "15672:15672"   # management UI
 
-  minio:
-    image: minio/minio
-    container_name: minio
-    ports:
-      - "9000:9000"  # S3 API
-      - "9001:9001"  # Console
-    env_file:
-      - .env
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
-    command: server /data --console-address ":9001"
+  api:
+    build: ./backend
+    env_file: .env
     volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: *health-interval
-      timeout: *health-timeout
-      retries: *health-retries
-
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    ports:
-      - "8000:8000"
+      - ./data/uploads:/app/data/uploads
     depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    volumes:
-      - ./inference_model:/inference_model:ro
-      - ./backend/app:/app  # optional for dev hot-reload if your Dockerfile supports it
-    env_file:
-      - .env
-    environment:
-      # DB / storage
-      DATABASE_URL: ${DATABASE_URL}                 # eg: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}             # eg: http://minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_BUCKET: ${MINIO_BUCKET}
-      # Celery (used by app to enqueue)
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}       # eg: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672//
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND} # eg: rpc://
-      # RAG / models
-      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME} # eg: sentence-transformers/all-MiniLM-L6-v2
-      FAISS_INDEX_PATH: /inference_model/faiss.index
-      LLM_MODEL_NAME: ${LLM_MODEL_NAME}             # eg: deepseek-ocr-finetuned
-      # PDF parsing flags (optional)
-      PDF_ENGINE: ${PDF_ENGINE}                     # pymupdf|pdfplumber
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+      - db
+      - rabbitmq
+    ports: ["8000:8000"]
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   worker:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    command: celery -A app.celery_app.worker worker --loglevel=INFO --concurrency=${CELERY_CONCURRENCY:-2}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_BUCKET: ${MINIO_BUCKET}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
-      EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME}
-      FAISS_INDEX_PATH: /inference_model/faiss.index
-      LLM_MODEL_NAME: ${LLM_MODEL_NAME}
-      PDF_ENGINE: ${PDF_ENGINE}
+    build: ./backend
+    env_file: .env
     volumes:
-      - ./inference_model:/inference_model:ro
+      - ./data/uploads:/app/data/uploads
+    depends_on:
+      - db
+      - rabbitmq
+    command: celery -A app.celery_app.celery_app worker -l info
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    depends_on:
-      backend:
-        condition: service_started
-    environment:
-      # For React, this should be prefixed with REACT_APP_ (or VITE_ if using Vite)
-      REACT_APP_BACKEND_URL: ${BACKEND_URL} # eg: http://localhost:8000
     volumes:
-      - ./ui:/usr/src/app  # optional for dev hot-reload
-      - /usr/src/app/node_modules
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    depends_on:
+      - backend
 
 volumes:
-  postgres_data:
-  minio_data:
-  rabbitmq_data:
+  pgdata:
