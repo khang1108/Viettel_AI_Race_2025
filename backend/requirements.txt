@@ -1,14 +1,28 @@
 fastapi==0.115.*
 uvicorn[standard]==0.30.*
-pydantic==2.*
+pydantic>=2.4.0
+pydantic-settings>=2.0.3
 python-multipart==0.0.9
+aiofiles==23.2.*
+
+# Database
 SQLAlchemy==2.0.*
 psycopg2-binary==2.9.*
-alembic==1.13.*         # optional if you prefer migrations
+asyncpg==0.29.*
+alembic==1.13.*
+
+# Task Queue
 celery==5.4.*
-pika==1.3.*             # (Celery pulls kombu, but pika handy if needed)
-pdfminer.six==20231228  # robust pure-Python text extraction
-pypdf==5.*              # fallback/extract metadata
-sentence-transformers==3.*
+pika==1.3.*
+
+# PDF Processing
+pdfminer.six==20231228
+pypdf==5.*
+
+# ML/Embeddings
+sentence-transformers>=4.32.0
 numpy==1.26.*
+torch>=2.0.0
+
+# Utilities
 python-dotenv==1.*

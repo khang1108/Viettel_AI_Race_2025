@@ -1,64 +1,106 @@
-version: "3.9"
+version: '3.8'
+
 services:
   db:
-    image: pgvector/pgvector:pg16
+    image: ankane/pgvector:latest
     environment:
-      POSTGRES_USER: ${PGUSER}
-      POSTGRES_PASSWORD: ${PGPASSWORD}
-      POSTGRES_DB: ${PGDATABASE}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rag
+    ports:
+      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports: ["5432:5432"]
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/app/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PGUSER} -d ${PGDATABASE}"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
       timeout: 5s
-      retries: 10
-
+      retries: 5
 
   rabbitmq:
     image: rabbitmq:3-management
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     ports:
       - "5672:5672"
-      - "15672:15672"   # management UI
+      - "15672:15672"  # Management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   api:
-    build: ./backend
-    env_file: .env
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      ROLE: api
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: rag
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      UPLOAD_DIR: /data/uploads
+      DATA_DIR: /data
+      SENTENCE_TRANSFORMERS_HOME: /data/models
+    ports:
+      - "8000:8000"
     volumes:
-      - ./data/uploads:/app/data/uploads
+      - ./backend:/app
+      - app_data:/data  # All data outside app folder
     depends_on:
-      - db
-      - rabbitmq
-    ports: ["8000:8000"]
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: /backend/start.sh
 
   worker:
-    build: ./backend
-    env_file: .env
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      ROLE: worker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: rag
+      RABBITMQ_USER: guest
+      RABBITMQ_PASS: guest
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      UPLOAD_DIR: /data/uploads
+      DATA_DIR: /data
+      SENTENCE_TRANSFORMERS_HOME: /data/models
     volumes:
-      - ./data/uploads:/app/data/uploads
+      - ./backend:/app
+      - app_data:/data  # Shared with API
     depends_on:
-      - db
-      - rabbitmq
-    command: celery -A app.celery_app.celery_app worker -l info
-
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: /backend/start.sh
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      API_BASE: http://api:8000
+    ports:
+      - "8501:8501"
     depends_on:
-      - backend
-
+      - api
+    restart: unless-stopped
 volumes:
-  pgdata:
+  postgres_data:
+  app_data:
+  
