@@ -60,7 +60,7 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    command: /backend/start.sh
+    command:  /start.sh
 
   worker:
     build:
@@ -88,7 +88,7 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    command: /backend/start.sh
+    command: /start.sh
   frontend:
     build:
       context: ./frontend
