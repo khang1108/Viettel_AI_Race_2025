@@ -1,7 +1,13 @@
 version: '3.8'
 
+networks:
+  rag_network:
+    driver: bridge
+
 services:
   db:
+    networks:
+      - rag_network
     image: ankane/pgvector:latest
     environment:
       POSTGRES_USER: postgres
@@ -19,6 +25,8 @@ services:
       retries: 5
 
   rabbitmq:
+    networks:
+      - rag_network
     image: rabbitmq:3-management
     environment:
       RABBITMQ_DEFAULT_USER: guest
@@ -33,6 +41,8 @@ services:
       retries: 5
 
   api:
+    networks:
+      - rag_network
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -49,7 +59,7 @@ services:
       RABBITMQ_PORT: 5672
       UPLOAD_DIR: /data/uploads
       DATA_DIR: /data
-      SENTENCE_TRANSFORMERS_HOME: /data/models
+      SENTENCE_TRANSFORMERS_HOME: /models
     ports:
       - "8000:8000"
     volumes:
@@ -60,9 +70,17 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    command:  /start.sh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: /start.sh
 
   worker:
+    networks:
+      - rag_network
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -79,7 +97,7 @@ services:
       RABBITMQ_PORT: 5672
       UPLOAD_DIR: /data/uploads
       DATA_DIR: /data
-      SENTENCE_TRANSFORMERS_HOME: /data/models
+      SENTENCE_TRANSFORMERS_HOME: /models
     volumes:
       - ./backend:/app
       - app_data:/data  # Shared with API
@@ -89,7 +107,10 @@ services:
       rabbitmq:
         condition: service_healthy
     command: /start.sh
+
   frontend:
+    networks:
+      - rag_network
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -98,9 +119,10 @@ services:
     ports:
       - "8501:8501"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
+
 volumes:
   postgres_data:
-  app_data:
-  
+  app_data:  # Single volume for all app data (uploads, models, etc.)

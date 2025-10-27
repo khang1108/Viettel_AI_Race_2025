@@ -1,6 +1,10 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    # Paths 
+    UPLOAD_DIR: str = "/data/uploads"
+    DATA_DIR: str = "/data"  # Base data directory
+    
     # Database
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
@@ -25,15 +29,11 @@ class Settings(BaseSettings):
     RABBITMQ_PORT: int = 5672
     RABBITMQ_VHOST: str = "/"
     
-    # Embedding - CHANGED: Model cache outside app
+    # Embedding 
     EMBED_MODEL_NAME: str = "all-MiniLM-L6-v2"
     EMBED_DIM: int = 384
     SENTENCE_TRANSFORMERS_HOME: str = "/models"  # Model cache location
-    
-    # Paths - CHANGED: All data outside app folder
-    UPLOAD_DIR: str = "/data/uploads"
-    DATA_DIR: str = "/data"  # Base data directory
-    
+
     @property
     def DATABASE_URL(self) -> str:
         """Async database URL for SQLAlchemy"""

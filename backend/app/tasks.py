@@ -49,10 +49,14 @@ def ingest_pdf(self, document_id: str, path: str, filename: str, mime_type: str,
                 chunk_id = str(uuid.uuid4())
                 vec_str = "[" + ",".join(f"{x:.6f}" for x in vec.tolist()) + "]"
                 
+                vec_list = [float(x) for x in (vec.tolist() if hasattr(vec, "tolist") else vec)]
+                vec_str = "[" + ",".join(f"{x:.6f}" for x in vec_list) + "]"
+
                 conn.execute(
                     text("""
                         INSERT INTO chunks (id, document_id, ord, content, token_count, embedding)
-                        VALUES (:id, :doc_id, :ord, :content, :tokens, :emb::vector)
+-                        VALUES (:id, :doc_id, :ord, :content, :tokens, :emb::vector)
++                        VALUES (:id, :doc_id, :ord, :content, :tokens, CAST(:emb AS vector))
                     """),
                     {
                         "id": chunk_id,
