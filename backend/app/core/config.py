@@ -50,8 +50,7 @@ class Settings(BaseSettings):
     
     @property
     def CELERY_RESULT_BACKEND(self) -> str:
-        return "rpc://"
-
+        return "redis://redis:6379/0"
     class Config:
         env_file = ".env"
 

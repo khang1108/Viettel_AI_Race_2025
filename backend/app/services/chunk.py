@@ -33,8 +33,8 @@ def split_into_chunks(text: str, max_chars: int = 1200, overlap: int = 150):
             chunks.append(chunk)
         
         # Move forward with overlap
+        if end >= len(text):
+            break
         i = end - overlap
-        if i <= 0:
-            i = end
     
     return chunks

@@ -1,6 +1,6 @@
 import uuid
 import logging
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text as sql_text
 from app.celery_app import celery_app
 from app.core.config import settings
 from app.services.pdf import extract_pdf_text
@@ -26,13 +26,13 @@ def ingest_pdf(self, document_id: str, path: str, filename: str, mime_type: str,
         logger.info(f"Processing document {document_id}: {filename}")
         
         # 1. Extract text
-        text = extract_pdf_text(path)
-        if not text.strip():
+        doc_text = extract_pdf_text(path)
+        if not doc_text.strip():
             logger.warning(f"No text extracted from {filename}")
             return {"status": "empty", "document_id": document_id}
         
         # 2. Split into chunks
-        chunks = split_into_chunks(text)
+        chunks = split_into_chunks(doc_text)
         if not chunks:
             logger.warning(f"No chunks created from {filename}")
             return {"status": "no_chunks", "document_id": document_id}
@@ -47,16 +47,14 @@ def ingest_pdf(self, document_id: str, path: str, filename: str, mime_type: str,
             # Bulk insert chunks with embeddings
             for idx, (content, vec) in enumerate(zip(chunks, embeddings)):
                 chunk_id = str(uuid.uuid4())
-                vec_str = "[" + ",".join(f"{x:.6f}" for x in vec.tolist()) + "]"
                 
                 vec_list = [float(x) for x in (vec.tolist() if hasattr(vec, "tolist") else vec)]
                 vec_str = "[" + ",".join(f"{x:.6f}" for x in vec_list) + "]"
 
                 conn.execute(
-                    text("""
+                    sql_text("""
                         INSERT INTO chunks (id, document_id, ord, content, token_count, embedding)
--                        VALUES (:id, :doc_id, :ord, :content, :tokens, :emb::vector)
-+                        VALUES (:id, :doc_id, :ord, :content, :tokens, CAST(:emb AS vector))
+                        VALUES (:id, :doc_id, :ord, :content, :tokens, CAST(:emb AS vector))
                     """),
                     {
                         "id": chunk_id,
@@ -79,4 +77,4 @@ def ingest_pdf(self, document_id: str, path: str, filename: str, mime_type: str,
     except Exception as e:
         logger.error(f"Error processing {filename}: {e}", exc_info=True)
         # Retry with exponential backoff
-        raise self.retry(exc=e, countdown=2 ** self.request.retries)
+        raise self.retry(exc=e, countdown=min(60, 2 ** self.request.retries))

@@ -5,11 +5,23 @@ networks:
     driver: bridge
 
 services:
+  redis:
+    networks:
+      - rag_network
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   db:
     networks:
       - rag_network
     image: ankane/pgvector:latest
-    env_file: .env
+    env_file:
+      - .env
     ports:
       - "5432:5432"
     volumes:
@@ -25,10 +37,11 @@ services:
     networks:
       - rag_network
     image: rabbitmq:3-management
-    env_file: .env  
+    env_file:
+      - .env
     ports:
       - "5672:5672"
-      - "15672:15672"  # Management UI
+      - "15672:15672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -41,16 +54,19 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    env_file: .env
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - app_data:/data  # All data outside app folder
+      - app_data:/data
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -66,14 +82,17 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    env_file: .env
+    env_file:
+      - .env
     volumes:
       - ./backend:/app
-      - app_data:/data  # Shared with API
+      - app_data:/data
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: /start.sh
 
@@ -94,4 +113,4 @@ services:
 
 volumes:
   postgres_data:
-  app_data:  # Single volume for all app data (uploads, models, etc.)
+  app_data:

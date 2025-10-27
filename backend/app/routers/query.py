@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+from sqlalchemy import text, bindparam, Integer
 from pydantic import BaseModel
 from typing import List
 import logging
@@ -42,17 +42,16 @@ async def search_documents(
         # Use raw SQL with proper parameter binding
         query_sql = text("""
             SELECT 
-                c.id::text as chunk_id,
-                c.document_id::text as document_id,
+                c.id::text AS chunk_id,
+                c.document_id::text AS document_id,
                 c.content,
-                (1 - (c.embedding <=>  CAST(:query_vec AS vector))) as similarity,
+                (1 - (c.embedding <=> CAST(:query_vec AS vector))) AS similarity,
                 d.filename
             FROM chunks c
             JOIN documents d ON c.document_id = d.id
             ORDER BY c.embedding <=> CAST(:query_vec AS vector)
             LIMIT :top_k
-        """)
-        
+        """).bindparams(bindparam("top_k", type_=Integer))
         # Execute query
         result = await db.execute(query_sql, {"query_vec": vec_str, "top_k": top_k})
         rows = result.fetchall()
