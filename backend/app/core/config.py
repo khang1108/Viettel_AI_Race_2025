@@ -12,10 +12,10 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "rag"
     
-    # LLM Settings
-    LLM_MODEL_PATH: str = "deepseek-ai/deepseek-ocr"
-    LLM_MAX_LENGTH: int = 512
-    LLM_TEMPERATURE: float = 0.7
+    # # LLM Settings
+    # LLM_MODEL_PATH: str = "deepseek-ai/deepseek-ocr"
+    # LLM_MAX_LENGTH: int = 512
+    # LLM_TEMPERATURE: float = 0.7
     
     # DB Pool Settings
     DB_ECHO: bool = False
@@ -28,9 +28,9 @@ class Settings(BaseSettings):
     RABBITMQ_HOST: str = "rabbitmq"
     RABBITMQ_PORT: int = 5672
     RABBITMQ_VHOST: str = "/"
-    
-    # Embedding 
-    EMBED_MODEL_NAME: str = "all-MiniLM-L6-v2"
+
+    # Embedding
+    EMBED_MODEL_NAME: str = "paraphrase-MiniLM-L3-v2"
     EMBED_DIM: int = 384
     SENTENCE_TRANSFORMERS_HOME: str = "/models"  # Model cache location
 

@@ -9,10 +9,7 @@ services:
     networks:
       - rag_network
     image: ankane/pgvector:latest
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: rag
+    env_file: .env
     ports:
       - "5432:5432"
     volumes:
@@ -28,9 +25,7 @@ services:
     networks:
       - rag_network
     image: rabbitmq:3-management
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+    env_file: .env  
     ports:
       - "5672:5672"
       - "15672:15672"  # Management UI
@@ -46,20 +41,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    environment:
-      ROLE: api
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: rag
-      RABBITMQ_USER: guest
-      RABBITMQ_PASS: guest
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      UPLOAD_DIR: /data/uploads
-      DATA_DIR: /data
-      SENTENCE_TRANSFORMERS_HOME: /models
+    env_file: .env
     ports:
       - "8000:8000"
     volumes:
@@ -84,20 +66,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    environment:
-      ROLE: worker
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_HOST: db
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: rag
-      RABBITMQ_USER: guest
-      RABBITMQ_PASS: guest
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      UPLOAD_DIR: /data/uploads
-      DATA_DIR: /data
-      SENTENCE_TRANSFORMERS_HOME: /models
+    env_file: .env
     volumes:
       - ./backend:/app
       - app_data:/data  # Shared with API

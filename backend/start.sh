@@ -69,20 +69,22 @@ fi
 # Create data directories outside app folder
 mkdir -p "${DATA_DIR:-/data}"
 mkdir -p "${UPLOAD_DIR:-/data/uploads}"
-mkdir -p "${SENTENCE_TRANSFORMERS_HOME:-/models}"
+mkdir -p "${SENTENCE_TRANSFORMERS_HOME:-/data/models}"
 
 echo "Data directories:"
 echo "  DATA_DIR: ${DATA_DIR:-/data}"
 echo "  UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}"
-echo "  MODEL_CACHE: ${SENTENCE_TRANSFORMERS_HOME:-/models}"
+echo "  MODEL_CACHE: ${SENTENCE_TRANSFORMERS_HOME:-/data/models}"
 
 # Start service based on role
 if [ "${ROLE}" = "worker" ]; then
     echo "Starting Celery worker..."
     exec celery -A app.celery_app.celery_app worker \
         --loglevel=info \
-        --concurrency=2 \
-        --max-tasks-per-child=50
+        --concurrency=1 \
+        --pool=solo \
+        --max-tasks-per-child=5 \
+        -Ofair
 else
     echo "Starting FastAPI server..."
     exec uvicorn app.main:app \
