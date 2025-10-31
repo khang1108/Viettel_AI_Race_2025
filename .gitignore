@@ -1,4 +1,10 @@
-/data
-/viettelairace
-/other
+/data/
+/viettelairace/
+/viettel/
+/other/
+/yolo11_doc_layout/
+
 .env
+
+__pycache__/
+*.pyc
